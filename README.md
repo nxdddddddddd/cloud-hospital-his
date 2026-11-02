@@ -12,8 +12,17 @@
 
 ```text
 docs/    项目需求与协作规范
+frontend/ Vue 3 前端工程
 sql/     数据库脚本
 ```
 
-当前仓库已完成项目资料初始化，业务代码将在后续开发阶段加入。
+## 前端启动
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+开发环境默认启用模拟登录，可直接使用页面预填账号进入工作台。连接RuoYi后端时，将 `.env.development` 中的 `VITE_USE_MOCK_AUTH` 改为 `false`，并配置后端代理地址。
 
