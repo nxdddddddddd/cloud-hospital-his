@@ -54,7 +54,13 @@ async function handleCommand(command: string) {
           </el-dropdown>
         </div>
       </header>
-      <main class="page-container"><router-view /></main>
+      <main class="page-container">
+        <router-view v-slot="{ Component, route: currentRoute }">
+          <transition name="page" mode="out-in">
+            <component :is="Component" :key="currentRoute.path" />
+          </transition>
+        </router-view>
+      </main>
     </section>
   </div>
 </template>
