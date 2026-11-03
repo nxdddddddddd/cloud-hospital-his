@@ -11,10 +11,9 @@
 ## 目录
 
 ```text
-docs/         项目需求与协作规范
-ruoyi-admin/  后端启动模块
-ruoyi-his/    HIS业务模块
-sql/          数据库脚本
+backend/   RuoYi后端及HIS业务模块
+docs/      项目需求与协作规范
+sql/       数据库脚本
 ```
 
 ## 后端启动
@@ -26,6 +25,7 @@ sql/          数据库脚本
 3. 构建并启动：
 
 ```bash
+cd backend
 mvn -pl ruoyi-admin -am clean package -DskipTests
 java -jar ruoyi-admin/target/ruoyi-admin.jar
 ```
