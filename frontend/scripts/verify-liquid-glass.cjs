@@ -17,6 +17,8 @@ const checks = [
   [css.includes('.el-table__body'), 'opaque table body rule is missing'],
   [css.includes('.login-page'), 'login page glass treatment is missing'],
   [css.includes('background: var(--el-button-bg-color);'), 'primary button background must remain visible'],
+  [css.includes('--glass-surface: rgba(255, 255, 255, .48);'), 'glass surface must use the approved high transparency'],
+  [css.includes('--glass-ambient: rgba(214, 221, 225, .34);'), 'ambient light must stay neutral'],
 ]
 
 for (const [passed, message] of checks) {
