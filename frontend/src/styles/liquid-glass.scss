@@ -168,6 +168,19 @@ body::after {
   -webkit-backdrop-filter: var(--glass-blur);
 }
 
+@supports (backdrop-filter: url('#his-liquid-edge')) {
+  .topbar {
+    backdrop-filter: url(#his-liquid-edge) blur(22px) saturate(125%);
+  }
+
+  .sidebar .el-menu-item.is-active,
+  .topbar .el-button:not(.el-button--primary),
+  .queue-tabs button.active {
+    backdrop-filter: url(#his-liquid-edge) blur(12px) saturate(115%);
+    -webkit-backdrop-filter: blur(12px) saturate(115%);
+  }
+}
+
 .topbar-left p,
 .department span,
 .user-card > div span,

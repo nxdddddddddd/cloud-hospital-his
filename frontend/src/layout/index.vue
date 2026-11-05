@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { hasPermission } from '@/utils/permission'
+import LiquidGlassDefs from '@/components/LiquidGlassDefs.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -21,6 +22,7 @@ async function handleCommand(command: string) {
 </script>
 
 <template>
+  <LiquidGlassDefs />
   <div class="app-shell" :class="{ collapsed }">
     <aside class="sidebar">
       <div class="brand">
