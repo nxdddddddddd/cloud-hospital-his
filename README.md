@@ -8,9 +8,42 @@
 
 ### 首次初始化
 
-1. 依次执行 `sql/his_cloud.sql`、`sql/ruoyi_system.sql`、`sql/quartz.sql`。后两个脚本需在 `his_cloud_completed` 数据库中执行。
-2. 在 `frontend` 目录将 `.env.example` 复制为 `.env.development`，然后执行 `npm install`。
-3. 启动 MySQL 和 Redis。数据库账号不是默认的 `root/password` 时，设置 `HIS_DB_USERNAME`、`HIS_DB_PASSWORD` 等环境变量。
+1. 启动 MySQL，在项目根目录打开 CMD 并进入 SQL 目录：
+
+```text
+cd sql
+mysql -u root -p
+```
+
+如果提示 `mysql` 不是命令，请改用 MySQL 安装目录下的程序，例如：
+
+```text
+"C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe" -u root -p
+```
+
+2. 输入 MySQL 密码，出现 `mysql>` 后逐行执行：
+
+```sql
+source his_cloud.sql
+USE his_cloud_completed;
+source ruoyi_system.sql
+source quartz.sql
+```
+
+`his_cloud.sql` 会创建并切换到 `his_cloud_completed` 数据库，后两个脚本必须继续在该数据库中执行。
+
+3. 检查导入结果：
+
+```sql
+SHOW TABLES;
+SELECT user_id, user_name, status FROM sys_user;
+exit
+```
+
+正常应显示 53 张表，并能查询到 `admin` 用户。
+
+4. 在 `frontend` 目录将 `.env.example` 复制为 `.env.development`，然后执行 `npm install`。
+5. 启动 Redis。数据库账号不是默认的 `root/password` 时，在 IDEA 的 `RuoYiApplication` 运行配置中设置 `HIS_DB_USERNAME`、`HIS_DB_PASSWORD` 环境变量。
 
 ### 日常启动
 
