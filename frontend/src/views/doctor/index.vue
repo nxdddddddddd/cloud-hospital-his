@@ -62,8 +62,8 @@ const medicalItemKeyword = ref('')
 const pendingMedicalItemIds = ref<number[]>([])
 const prescriptionLines = ref<PrescriptionLine[]>([])
 const drugDialogVisible = ref(false)
-const drugSearchMode = ref<'code' | 'name'>('code')
-const drugKeyword = ref('')
+const drugCodeKeyword = ref('')
+const drugNameKeyword = ref('')
 const selectedDrugIds = ref<number[]>([])
 
 const currentVisit = computed(() => visits.value.find((item) => item.registrationId === selectedId.value))
@@ -83,9 +83,13 @@ const filteredMedicalItems = computed(() => {
 const costTotal = computed(() => sumCosts(costs.value))
 const prescriptionTotal = computed(() => prescriptionLines.value.reduce((total, line) => total + Number(drugOf(line.drugId)?.price ?? 0) * Number(line.quantity || 0), 0))
 const filteredDrugs = computed(() => {
-  const value = drugKeyword.value.trim().toLocaleLowerCase('zh-CN')
-  if (!value) return catalogs.drug
-  return catalogs.drug.filter((drug) => String(drug[drugSearchMode.value] ?? '').toLocaleLowerCase('zh-CN').includes(value))
+  const code = drugCodeKeyword.value.trim().toLocaleLowerCase('zh-CN')
+  const name = drugNameKeyword.value.trim().toLocaleLowerCase('zh-CN')
+  return catalogs.drug.filter((drug) => {
+    const matchesCode = !code || String(drug.code ?? '').toLocaleLowerCase('zh-CN').includes(code)
+    const matchesName = !name || String(drug.name ?? '').toLocaleLowerCase('zh-CN').includes(name)
+    return matchesCode && matchesName
+  })
 })
 
 onMounted(async () => {
@@ -194,7 +198,7 @@ function addSelectedMedicalItems() {
 
 function drugOf(id: number) { return catalogs.drug.find((item) => item.id === id) }
 function removePrescriptionLine(index: number) { prescriptionLines.value.splice(index, 1) }
-function openDrugDialog() { selectedDrugIds.value = []; drugKeyword.value = ''; drugDialogVisible.value = true }
+function openDrugDialog() { selectedDrugIds.value = []; drugCodeKeyword.value = ''; drugNameKeyword.value = ''; drugDialogVisible.value = true }
 function handleDrugSelection(rows: CatalogItem[]) { selectedDrugIds.value = rows.map((item) => item.id) }
 function addSelectedDrugs() {
   if (!selectedDrugIds.value.length) return ElMessage.warning('请选择需要添加的药品')
@@ -335,7 +339,7 @@ function statusType(status: string) { return status === 'UNPAID' ? 'warning' : s
     </el-dialog>
 
     <el-dialog v-model="drugDialogVisible" title="添加药品" width="760px">
-      <div class="drug-search"><el-select v-model="drugSearchMode"><el-option label="药品编码" value="code" /><el-option label="药品名称" value="name" /></el-select><el-input v-model="drugKeyword" placeholder="请输入检索内容" clearable><template #prefix><el-icon><Search /></el-icon></template></el-input><el-button type="primary">搜索</el-button></div>
+      <div class="drug-search"><div class="drug-search-fields"><el-input v-model="drugCodeKeyword" placeholder="请输入药品编码" clearable><template #prefix><el-icon><Search /></el-icon></template></el-input><el-input v-model="drugNameKeyword" placeholder="请输入药品名称" clearable><template #prefix><el-icon><Search /></el-icon></template></el-input></div><el-button type="primary">搜索</el-button></div>
       <el-table :data="filteredDrugs" row-key="id" max-height="420" @selection-change="handleDrugSelection"><el-table-column type="selection" width="48" /><el-table-column prop="code" label="药品编码" width="120" /><el-table-column prop="name" label="药品名称" min-width="150" /><el-table-column prop="format" label="药品规格" width="150" /><el-table-column prop="price" label="药品单价" width="100"><template #default="scope">¥{{ Number(scope.row.price).toFixed(2) }}</template></el-table-column><el-table-column prop="unit" label="单位" width="70" /><el-table-column prop="stock" label="库存" width="80" /></el-table>
       <template #footer><el-button @click="drugDialogVisible = false">关闭</el-button><el-button type="primary" @click="addSelectedDrugs">添加</el-button></template>
     </el-dialog>
@@ -348,4 +352,6 @@ function statusType(status: string) { return status === 'UNPAID' ? 'warning' : s
 .content-section-title{margin:18px 4px 10px;font-size:15px}
 .standalone-order{margin:0;padding:0;border-top:0}
 .standalone-result{margin:0;padding:0;border-top:0}
+.drug-search{grid-template-columns:1fr 80px;align-items:end}
+.drug-search-fields{display:grid;gap:10px}
 </style>
