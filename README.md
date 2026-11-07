@@ -28,9 +28,12 @@ source his_cloud.sql
 USE his_cloud_completed;
 source ruoyi_system.sql
 source quartz.sql
+source his_demo_data.sql
 ```
 
-`his_cloud.sql` 会创建并切换到 `his_cloud_completed` 数据库，后两个脚本必须继续在该数据库中执行。
+`his_cloud.sql` 会创建并切换到 `his_cloud_completed` 数据库，后三个脚本必须继续在该数据库中执行。最后一个脚本提供作业演示账号、基础目录和虚构患者，可重复执行；不需要演示数据时可以跳过。
+
+数据库表关系、状态流转和设计说明见[数据库设计说明](docs/数据库设计说明.md)；三人协作的接口路径、字段、状态值和数据归属见[数据库接口名单](docs/数据库接口名单.md)。
 
 3. 检查导入结果：
 
@@ -40,7 +43,7 @@ SELECT user_id, user_name, status FROM sys_user;
 exit
 ```
 
-正常应显示 53 张表，并能查询到 `admin` 用户。
+正常应显示 53 张表，并能查询到 `admin` 用户。执行演示脚本后还提供 `doctor`、`cashier`、`examiner`、`lab`、`treatment`、`pharmacy` 六个岗位账号，演示密码均为 `admin123`。
 
 4. 在 `frontend` 目录将 `.env.example` 复制为 `.env.development`，然后执行 `npm install`。
 5. 启动 Redis。数据库账号不是默认的 `root/password` 时，在 IDEA 的 `RuoYiApplication` 运行配置中设置 `HIS_DB_USERNAME`、`HIS_DB_PASSWORD` 环境变量。
