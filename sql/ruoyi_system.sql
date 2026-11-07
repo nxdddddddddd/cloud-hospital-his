@@ -721,3 +721,9 @@ create table gen_table_column (
   update_time       datetime                                   comment '更新时间',
   primary key (column_id)
 ) engine=innodb auto_increment=1 comment = '代码生成业务表字段';
+
+-- ----------------------------
+-- 21、HIS员工与RuoYi登录账号关联（必须在本脚本所有sys_user数据之后执行）
+-- ----------------------------
+alter table employee
+  add constraint fk_employee_sys_user foreign key (sys_user_id) references sys_user (user_id);

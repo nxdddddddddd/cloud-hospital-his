@@ -62,16 +62,18 @@ CREATE TABLE `scheduling` (
   CONSTRAINT `ck_scheduling_2` CHECK (delmark IN (0,1))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='排班表';
 
--- 医院员工表：维护门诊医生、医技、收费及药房员工。
+-- 医院员工表：保存业务岗位资料，登录密码和角色统一由RuoYi sys_user/sys_role维护。
+-- sys_user在本脚本之后创建，因此其物理外键由ruoyi_system.sql末尾补充。
 CREATE TABLE `employee` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自增主键',
+  `sys_user_id` BIGINT NULL DEFAULT NULL COMMENT 'RuoYi登录用户ID；与sys_user.user_id类型一致，未开通账号的内部员工可空',
   `deptment_id` BIGINT UNSIGNED NOT NULL COMMENT '所属科室ID',
   `regist_level_id` BIGINT UNSIGNED NULL DEFAULT NULL COMMENT '挂号级别ID；非坐诊员工可空',
   `scheduling_id` BIGINT UNSIGNED NULL DEFAULT NULL COMMENT '排班规则ID；非坐诊员工可空',
   `realname` VARCHAR(64) NOT NULL COMMENT '员工真实姓名',
-  `password` VARCHAR(255) NOT NULL COMMENT '密码哈希，不保存明文；长度扩充为255',
   `delmark` TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '生效标记：1有效、0停用',
   PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_employee_1` (`sys_user_id`),
   KEY `idx_employee_1` (`deptment_id`, `delmark`),
   CONSTRAINT `fk_employee_1` FOREIGN KEY (`deptment_id`) REFERENCES `department` (`id`),
   CONSTRAINT `fk_employee_2` FOREIGN KEY (`regist_level_id`) REFERENCES `regist_level` (`id`),
@@ -465,5 +467,6 @@ CREATE TABLE `stock_movement` (
   CONSTRAINT `fk_stock_movement_2` FOREIGN KEY (`prescription_id`) REFERENCES `prescription` (`id`),
   CONSTRAINT `fk_stock_movement_3` FOREIGN KEY (`operator_id`) REFERENCES `employee` (`id`),
   CONSTRAINT `ck_stock_movement_1` CHECK (balance_after >= 0),
-  CONSTRAINT `ck_stock_movement_2` CHECK ((movement_type='RECEIPT' AND quantity_delta>0 AND prescription_id IS NULL) OR (movement_type='DISPENSE' AND quantity_delta<0 AND prescription_id IS NOT NULL) OR (movement_type='RETURN' AND quantity_delta>0 AND prescription_id IS NOT NULL))
+  CONSTRAINT `ck_stock_movement_2` CHECK ((movement_type='RECEIPT' AND quantity_delta>0 AND prescription_id IS NULL) OR (movement_type='DISPENSE' AND quantity_delta<0 AND prescription_id IS NOT NULL) OR (movement_type='RETURN' AND quantity_delta>0 AND prescription_id IS NOT NULL)),
+  CONSTRAINT `ck_stock_movement_3` CHECK (`movement_type` IN ('RECEIPT', 'DISPENSE', 'RETURN'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='出入库流水';
