@@ -29,6 +29,20 @@ export interface CompletionInput {
   result: string
 }
 
+export interface MedicalTechApiOrder extends Omit<MedicalTechOrder, 'id' | 'status'> {
+  id: number
+  status: 'PAID' | 'EXECUTING' | 'COMPLETED'
+}
+
+export function mapMedicalTechApiOrder(order: MedicalTechApiOrder): MedicalTechOrder {
+  const statusMap: Record<MedicalTechApiOrder['status'], MedicalTechStatus> = {
+    PAID: 'pending',
+    EXECUTING: 'inProgress',
+    COMPLETED: 'completed'
+  }
+  return { ...order, id: String(order.id), status: statusMap[order.status] }
+}
+
 export function filterMedicalTechOrders(orders: MedicalTechOrder[], filter: MedicalTechFilter) {
   const keyword = filter.keyword?.trim().toLocaleLowerCase('zh-CN') ?? ''
 

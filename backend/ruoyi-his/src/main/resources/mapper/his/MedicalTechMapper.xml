@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.his.mapper.MedicalTechMapper">
+    <select id="selectOrders" resultType="java.util.LinkedHashMap">
+        select rq.id,
+               concat(#{orderPrefix}, lpad(rq.id, 12, '0')) as orderNo,
+               #{category} as category,
+               reg.real_name as patientName,
+               reg.case_number as outpatientNo,
+               tech.tech_name as itemName,
+               dept.dept_name as department,
+               doctor.realname as doctorName,
+               date_format(rq.creation_time, '%Y-%m-%d %H:%i:%s') as appliedAt,
+               rq.${fieldPrefix}_state as status,
+               executor.realname as executor,
+               date_format(rq.${fieldPrefix}_time, '%Y-%m-%d %H:%i:%s') as executedAt,
+               rq.${fieldPrefix}_result as result
+        from ${tableName} rq
+        join register reg on reg.id = rq.register_id
+        join medical_technology tech on tech.id = rq.medical_technology_id
+        join department dept on dept.id = reg.deptment_id
+        join employee doctor on doctor.id = rq.created_by
+        left join employee executor on executor.id = rq.${fieldPrefix}_employee_id
+        where rq.${fieldPrefix}_state in ('PAID', 'EXECUTING', 'COMPLETED')
+        <if test="status != null and status != ''">and rq.${fieldPrefix}_state = #{status}</if>
+        <if test="keyword != null and keyword != ''">
+            and (reg.real_name like concat('%', #{keyword}, '%')
+              or reg.case_number like concat('%', #{keyword}, '%')
+              or tech.tech_name like concat('%', #{keyword}, '%'))
+        </if>
+        order by rq.creation_time desc, rq.id desc
+    </select>
+
+    <select id="selectEmployeeIdByName" resultType="long">
+        select id from employee where realname = #{executor} and delmark = 1 order by id limit 1
+    </select>
+
+    <update id="startOrder">
+        update ${tableName}
+        set ${fieldPrefix}_employee_id = #{employeeId},
+            ${fieldPrefix}_time = now(),
+            ${fieldPrefix}_state = 'EXECUTING'
+        where id = #{id} and ${fieldPrefix}_state = 'PAID'
+    </update>
+
+    <update id="completeOrder">
+        update ${tableName}
+        set ${fieldPrefix}_employee_id = #{employeeId},
+            ${inputEmployeeField} = #{employeeId},
+            ${fieldPrefix}_time = coalesce(str_to_date(#{executedAt}, '%Y-%m-%d %H:%i:%s'), now()),
+            ${fieldPrefix}_result = #{result},
+            ${fieldPrefix}_state = 'COMPLETED'
+        where id = #{id} and ${fieldPrefix}_state in ('PAID', 'EXECUTING')
+    </update>
+</mapper>

@@ -4,6 +4,7 @@ import {
   filterMedicalTechOrders,
   summarizeMedicalTechOrders,
   completeMedicalTechOrder,
+  mapMedicalTechApiOrder,
   type MedicalTechOrder
 } from '../src/domain/medicalTech.ts'
 
@@ -43,4 +44,24 @@ test('录入结果后申请转为已完成并保留执行信息', () => {
   assert.equal(completed.executor, '陈技师')
   assert.equal(completed.result, '未见明显异常')
   assert.equal(completed.executedAt, '2026-11-07 11:20')
+})
+
+test('后端医技状态映射为前端统一状态', () => {
+  const mapped = mapMedicalTechApiOrder({
+    id: 18,
+    orderNo: 'LAB18',
+    category: 'laboratory',
+    patientName: '王晓梅',
+    outpatientNo: 'MZ002',
+    itemName: '血常规',
+    department: '检验科',
+    doctorName: '周医生',
+    appliedAt: '2026-11-07 09:10:00',
+    status: 'EXECUTING',
+    executor: '林检验师'
+  })
+
+  assert.equal(mapped.id, '18')
+  assert.equal(mapped.status, 'inProgress')
+  assert.equal(mapped.appliedAt, '2026-11-07 09:10:00')
 })

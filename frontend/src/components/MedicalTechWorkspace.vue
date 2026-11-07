@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import PageHeader from '@/components/PageHeader.vue'
+import { listMedicalTechOrders, saveMedicalTechResult, startMedicalTechOrder, useMockMedicalTechApi } from '@/api/medicalTech'
 import { medicalTechOrders } from '@/data/medicalTech'
 import { completeMedicalTechOrder, filterMedicalTechOrders, summarizeMedicalTechOrders, type MedicalTechCategory, type MedicalTechOrder, type MedicalTechStatus } from '@/domain/medicalTech'
 
@@ -26,7 +27,8 @@ const status = ref<MedicalTechStatus | 'all'>(props.mode === 'pending' ? 'pendin
 const selected = ref<MedicalTechOrder>()
 const dialogVisible = ref(false)
 const resultForm = reactive({ executor: '', executedAt: '2026-11-07 11:20', result: '' })
-const patientForm = reactive({ patientName: '', outpatientNo: '', itemName: '', doctorName: '', department: '' })
+const patientForm = reactive({ patientName: '', outpatientNo: '', itemName: '', doctorName: '', department: '', executor: '' })
+const loading = ref(false)
 
 const currentCategory = computed(() => categoryConfig[props.category])
 const currentMode = computed(() => modeConfig[props.mode])
@@ -39,6 +41,19 @@ const displayedOrders = computed(() => filterMedicalTechOrders(orders.value, {
 }))
 
 watch(() => props.mode, (mode) => { status.value = mode === 'pending' ? 'pending' : 'all' })
+watch(() => props.category, () => { void loadOrders() })
+
+async function loadOrders() {
+  if (useMockMedicalTechApi()) return
+  loading.value = true
+  try {
+    orders.value = await listMedicalTechOrders(props.category)
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(loadOrders)
 
 function statusLabel(value: MedicalTechStatus) {
   return { pending: '待执行', inProgress: '执行中', completed: '已完成' }[value]
@@ -56,31 +71,41 @@ function openAction(order: MedicalTechOrder) {
   dialogVisible.value = true
 }
 
-function saveResult() {
+async function saveResult() {
   if (!selected.value || !resultForm.executor.trim() || !resultForm.result.trim()) {
     ElMessage.warning('请填写执行人员和结果内容')
     return
   }
-  const index = orders.value.findIndex((item) => item.id === selected.value?.id)
-  orders.value[index] = completeMedicalTechOrder(orders.value[index], { ...resultForm })
+  if (!useMockMedicalTechApi()) {
+    await saveMedicalTechResult(props.category, selected.value.id, { ...resultForm })
+    await loadOrders()
+  } else {
+    const index = orders.value.findIndex((item) => item.id === selected.value?.id)
+    orders.value[index] = completeMedicalTechOrder(orders.value[index], { ...resultForm })
+  }
   dialogVisible.value = false
   ElMessage.success(`${currentCategory.value.noun}结果已保存`)
 }
 
-function registerPatient() {
-  if (!patientForm.patientName || !patientForm.outpatientNo || !patientForm.itemName) {
-    ElMessage.warning('请填写患者、门诊号和执行项目')
+async function registerPatient() {
+  if (!patientForm.outpatientNo || !patientForm.itemName || !patientForm.executor) {
+    ElMessage.warning('请填写门诊号、执行项目和执行人员')
     return
   }
-  orders.value.unshift({
-    id: `${props.category}-${Date.now()}`,
-    orderNo: `${props.category === 'examination' ? 'CHK' : props.category === 'laboratory' ? 'LAB' : 'DSP'}${Date.now()}`,
-    category: props.category,
-    status: 'inProgress',
-    appliedAt: '2026-11-07 11:20',
-    ...patientForm
-  })
-  Object.assign(patientForm, { patientName: '', outpatientNo: '', itemName: '', doctorName: '', department: '' })
+  const order = categoryOrders.value.find((item) => item.status === 'pending' && item.outpatientNo === patientForm.outpatientNo && item.itemName === patientForm.itemName)
+  if (!order) {
+    ElMessage.warning('未找到匹配的待执行申请，请核对门诊号和项目')
+    return
+  }
+  if (!useMockMedicalTechApi()) {
+    await startMedicalTechOrder(props.category, order.id, patientForm.executor)
+    await loadOrders()
+  } else {
+    order.status = 'inProgress'
+    order.executor = patientForm.executor
+    order.executedAt = '2026-11-07 11:20'
+  }
+  Object.assign(patientForm, { patientName: '', outpatientNo: '', itemName: '', doctorName: '', department: '', executor: '' })
   ElMessage.success('患者已登记并进入执行中')
 }
 </script>
@@ -108,7 +133,8 @@ function registerPatient() {
           <el-col :span="6"><el-form-item :label="`${currentCategory.noun}项目`"><el-input v-model="patientForm.itemName" placeholder="请输入执行项目" /></el-form-item></el-col>
           <el-col :span="6"><el-form-item label="申请科室"><el-input v-model="patientForm.department" placeholder="请输入申请科室" /></el-form-item></el-col>
           <el-col :span="6"><el-form-item label="申请医生"><el-input v-model="patientForm.doctorName" placeholder="请输入申请医生" /></el-form-item></el-col>
-          <el-col :span="18" class="entry-actions"><el-button>读取就诊卡</el-button><el-button type="primary" @click="registerPatient">确认登记</el-button></el-col>
+          <el-col :span="6"><el-form-item label="执行人员"><el-input v-model="patientForm.executor" placeholder="请输入员工姓名" /></el-form-item></el-col>
+          <el-col :span="12" class="entry-actions"><el-button>读取就诊卡</el-button><el-button type="primary" @click="registerPatient">确认登记</el-button></el-col>
         </el-row>
       </el-form>
     </el-card>
@@ -120,7 +146,7 @@ function registerPatient() {
         <el-date-picker type="daterange" start-placeholder="开始日期" end-placeholder="结束日期" />
         <el-button type="primary">查询</el-button>
       </div>
-      <el-table :data="displayedOrders" stripe>
+      <el-table v-loading="loading" :data="displayedOrders" stripe>
         <el-table-column prop="orderNo" label="申请单号" width="180" />
         <el-table-column label="患者" width="150"><template #default="scope"><div class="patient-cell"><strong>{{ scope.row.patientName }}</strong><span>{{ scope.row.outpatientNo }}</span></div></template></el-table-column>
         <el-table-column prop="itemName" :label="`${currentCategory.noun}项目`" min-width="160" />
