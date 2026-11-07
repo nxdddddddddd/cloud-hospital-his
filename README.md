@@ -9,7 +9,7 @@
 ### 首次初始化
 
 1. 依次执行 `sql/his_cloud.sql`、`sql/ruoyi_system.sql`、`sql/quartz.sql`。后两个脚本需在 `his_cloud_completed` 数据库中执行。
-2. 在 `frontend` 目录将 `.env.example` 复制为 `.env.development`，然后执行 `npm install`。模板中的默认值可以直接启动，无需自行填写。
+2. 在 `frontend` 目录将 `.env.example` 复制为 `.env.development`，然后执行 `npm install`。
 3. 启动 MySQL 和 Redis。数据库账号不是默认的 `root/password` 时，设置 `HIS_DB_USERNAME`、`HIS_DB_PASSWORD` 等环境变量。
 
 ### 日常启动
