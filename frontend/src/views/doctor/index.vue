@@ -19,17 +19,11 @@ const props = withDefaults(defineProps<{ initialTab?: DoctorTab }>(), { initialT
 const route = useRoute()
 const router = useRouter()
 
-const pageConfig: Record<DoctorTab, { title: string; description: string; badge: string }> = {
-  patients: { title: '患者查看', description: '查看当前医生的待诊和已诊患者。', badge: '8.2.1' },
-  record: { title: '病历首页', description: '填写本次就诊的病史、查体和诊疗建议。', badge: '8.2.2' },
-  check: { title: '检查申请', description: '选择检查项目并填写检查医嘱。', badge: '8.2.3' },
-  inspection: { title: '检验申请', description: '选择检验项目并填写检验医嘱。', badge: '8.2.4' },
-  checkResult: { title: '检查结果', description: '查看检查科已经录入的执行结果。', badge: '8.2.5' },
-  inspectionResult: { title: '检验结果', description: '查看检验科已经录入的执行结果。', badge: '8.2.6' },
-  diagnosis: { title: '门诊确诊', description: '填写最终诊断和处理意见。', badge: '8.2.7' },
-  prescription: { title: '开设处方', description: '选择药品并填写处方明细。', badge: '8.2.8' },
-  disposal: { title: '处置申请', description: '选择处置项目并填写处置医嘱。', badge: '8.2.9' },
-  costs: { title: '费用查询', description: '查询本次诊疗的费用及业务状态。', badge: '8.2.10' }
+const pageConfig: Record<DoctorTab, { title: string }> = {
+  patients: { title: '患者查看' }, record: { title: '病历首页' }, check: { title: '检查申请' },
+  inspection: { title: '检验申请' }, checkResult: { title: '检查结果' },
+  inspectionResult: { title: '检验结果' }, diagnosis: { title: '门诊确诊' },
+  prescription: { title: '开设处方' }, disposal: { title: '处置申请' }, costs: { title: '费用查询' }
 }
 const pathMap: Record<DoctorTab, string> = {
   patients: 'patients', record: 'record', check: 'check', inspection: 'inspection',
@@ -63,7 +57,11 @@ const orderForms = reactive<Record<OrderType, { selectedIds: number[]; info: str
   inspection: { selectedIds: [], info: '', position: '', remark: '' },
   disposal: { selectedIds: [], info: '', position: '', remark: '' }
 })
-const prescriptionLines = ref<PrescriptionLine[]>([{ drugId: 0, usage: '', quantity: 1 }])
+const prescriptionLines = ref<PrescriptionLine[]>([])
+const drugDialogVisible = ref(false)
+const drugSearchMode = ref<'code' | 'name'>('code')
+const drugKeyword = ref('')
+const selectedDrugIds = ref<number[]>([])
 
 const currentVisit = computed(() => visits.value.find((item) => item.registrationId === selectedId.value))
 const patientRows = computed(() => filterDoctorVisits(visits.value, queueState.value, keyword.value))
@@ -75,6 +73,11 @@ const selectedOrderItems = computed(() => activeOrderType.value ? catalogs[activ
 const selectedOrderTotal = computed(() => selectedOrderItems.value.reduce((total, item) => total + Number(item.price), 0))
 const costTotal = computed(() => sumCosts(costs.value))
 const prescriptionTotal = computed(() => prescriptionLines.value.reduce((total, line) => total + Number(drugOf(line.drugId)?.price ?? 0) * Number(line.quantity || 0), 0))
+const filteredDrugs = computed(() => {
+  const value = drugKeyword.value.trim().toLocaleLowerCase('zh-CN')
+  if (!value) return catalogs.drug
+  return catalogs.drug.filter((drug) => String(drug[drugSearchMode.value] ?? '').toLocaleLowerCase('zh-CN').includes(value))
+})
 
 onMounted(async () => {
   await Promise.all([loadVisits(), loadCatalogs()])
@@ -168,10 +171,14 @@ async function submitOrder() {
 }
 
 function drugOf(id: number) { return catalogs.drug.find((item) => item.id === id) }
-function addPrescriptionLine() { prescriptionLines.value.push({ drugId: 0, usage: '', quantity: 1 }) }
-function removePrescriptionLine(index: number) {
-  if (prescriptionLines.value.length === 1) return ElMessage.warning('处方至少保留一条明细')
-  prescriptionLines.value.splice(index, 1)
+function removePrescriptionLine(index: number) { prescriptionLines.value.splice(index, 1) }
+function openDrugDialog() { selectedDrugIds.value = []; drugKeyword.value = ''; drugDialogVisible.value = true }
+function handleDrugSelection(rows: CatalogItem[]) { selectedDrugIds.value = rows.map((item) => item.id) }
+function addSelectedDrugs() {
+  if (!selectedDrugIds.value.length) return ElMessage.warning('请选择需要添加的药品')
+  const existing = new Set(prescriptionLines.value.map((item) => item.drugId))
+  selectedDrugIds.value.forEach((drugId) => { if (!existing.has(drugId)) prescriptionLines.value.push({ drugId, usage: '', quantity: 1 }) })
+  drugDialogVisible.value = false
 }
 
 async function submitPrescription() {
@@ -179,7 +186,7 @@ async function submitPrescription() {
   const validLines = prescriptionLines.value.filter((item) => item.drugId && item.usage.trim() && item.quantity > 0)
   if (!validLines.length || validLines.length !== prescriptionLines.value.length) return ElMessage.warning('请完整填写处方明细')
   if (!useMockDoctorApi()) await createPrescription(currentVisit.value.registrationId, validLines)
-  prescriptionLines.value = [{ drugId: 0, usage: '', quantity: 1 }]
+  prescriptionLines.value = []
   ElMessage.success('处方已开立')
 }
 
@@ -213,7 +220,7 @@ function statusType(status: string) { return status === 'UNPAID' ? 'warning' : s
 
 <template>
   <section class="doctor-module">
-    <PageHeader :title="heading.title" :description="heading.description" :badge="heading.badge">
+    <PageHeader :title="heading.title" description="">
       <el-button v-if="currentPage !== 'patients'" @click="router.push('/doctor/patients')">返回患者列表</el-button>
       <el-button v-if="currentPage !== 'patients' && currentVisit?.visitState === 2" type="primary" @click="completeCurrentVisit">完成诊疗</el-button>
       <el-button v-if="currentPage === 'patients'" @click="loadVisits"><el-icon><Refresh /></el-icon>刷新</el-button>
@@ -233,7 +240,7 @@ function statusType(status: string) { return status === 'UNPAID' ? 'warning' : s
         <el-table v-loading="loading" :data="patientRows" stripe>
           <el-table-column type="index" label="编号" width="80" /><el-table-column prop="patientName" label="患者姓名" width="140" /><el-table-column prop="caseNumber" label="病历号" min-width="180" />
           <el-table-column label="性别/年龄" width="120"><template #default="scope">{{ scope.row.gender || '-' }} / {{ scope.row.age ?? '-' }}{{ scope.row.ageType }}</template></el-table-column><el-table-column prop="departmentName" label="挂号科室" width="130" />
-          <el-table-column label="状态" width="110"><template #default="scope"><el-tag :type="scope.row.visitState === 1 ? 'warning' : scope.row.visitState === 2 ? 'primary' : 'success'">{{ visitStateLabel(scope.row.visitState) }}</el-tag></template></el-table-column>
+          <el-table-column label="状态" width="110"><template #default="scope"><el-tag :type="scope.row.visitState === 3 ? 'success' : 'primary'">{{ visitStateLabel(scope.row.visitState) }}</el-tag></template></el-table-column>
           <el-table-column label="操作" min-width="250" fixed="right"><template #default="scope"><el-button link type="primary" @click="openPatient(scope.row)">{{ scope.row.visitState === 1 ? '创建病案' : scope.row.visitState === 2 ? '继续诊疗' : '查看病历' }}</el-button><el-button v-if="scope.row.visitState === 1" link @click="skipPatient(scope.row)">跳过</el-button><el-button v-if="scope.row.visitState !== 3" link @click="callPatient(scope.row)">叫号</el-button></template></el-table-column>
           <template #empty><el-empty description="暂无患者" /></template>
         </el-table>
@@ -250,9 +257,9 @@ function statusType(status: string) { return status === 'UNPAID' ? 'warning' : s
       <el-empty v-else description="暂无可用患者，请先返回患者查看接诊" />
 
       <el-card v-if="currentVisit && currentPage === 'record'" shadow="never" class="business-card page-card">
-        <template #header><div class="section-title"><strong>病历首页</strong><span>带 * 的项目为必填内容</span></div></template>
-        <el-form label-width="110px" label-position="left" class="clinical-form record-sheet">
-          <el-form-item label="主诉 *"><el-input v-model="record.readme" type="textarea" :rows="2" placeholder="请输入主诉" /></el-form-item>
+        <template #header><div class="section-title"><strong>病历首页</strong></div></template>
+        <div class="medical-order record-order"><h4>病历内容</h4><el-form label-width="90px" class="clinical-form">
+          <el-form-item label="主诉"><el-input v-model="record.readme" type="textarea" :rows="2" placeholder="请输入主诉" /></el-form-item>
           <el-form-item label="现病史"><el-input v-model="record.present" type="textarea" :rows="2" placeholder="请输入现病史" /></el-form-item>
           <el-form-item label="现病治疗情况"><el-input v-model="record.presentTreat" type="textarea" :rows="2" placeholder="请输入现病治疗情况" /></el-form-item>
           <el-form-item label="既往史"><el-input v-model="record.history" type="textarea" :rows="2" placeholder="请输入既往史" /></el-form-item>
@@ -261,37 +268,36 @@ function statusType(status: string) { return status === 'UNPAID' ? 'warning' : s
           <el-form-item label="诊断"><div class="record-disease"><el-select v-model="diseaseIds" multiple filterable placeholder="按 ICD 编码或疾病名称添加诊断"><el-option v-for="item in catalogs.disease" :key="item.id" :label="`${item.format} · ${item.name}`" :value="item.id" /></el-select><el-table :data="catalogs.disease.filter(item => diseaseIds.includes(item.id))" size="small"><el-table-column prop="code" label="疾病编码" width="150" /><el-table-column prop="name" label="疾病名称" min-width="180" /><el-table-column prop="format" label="国际 ICD 编码" width="170" /><el-table-column prop="category" label="疾病类型" width="140" /><template #empty><el-empty :image-size="45" description="暂无诊断" /></template></el-table></div></el-form-item>
           <el-form-item label="检查/检验建议"><el-input v-model="record.proposal" type="textarea" :rows="2" placeholder="请输入检查/检验建议" /></el-form-item>
           <el-form-item label="注意事项"><el-input v-model="record.careful" type="textarea" :rows="2" placeholder="请输入注意事项" /></el-form-item>
-          <div class="form-actions"><el-button type="primary" :loading="saving" @click="saveRecord">保存</el-button><el-button @click="Object.assign(record, emptyRecord(currentVisit.registrationId)); diseaseIds = []">清空</el-button></div>
-        </el-form>
+        </el-form><div class="form-actions"><el-button type="primary" :loading="saving" @click="saveRecord">保存</el-button><el-button @click="Object.assign(record, emptyRecord(currentVisit.registrationId)); diseaseIds = []">清空</el-button></div></div>
       </el-card>
 
       <el-card v-if="currentVisit && activeOrderType" shadow="never" class="business-card page-card">
-        <template #header><div class="section-title"><strong>{{ orderConfig[activeOrderType].label }}申请</strong><span>项目明细与医嘱</span><div class="amount-badge">项目金额：¥{{ selectedOrderTotal.toFixed(2) }}</div></div></template>
-        <div class="catalog-picker"><el-select v-model="orderForms[activeOrderType].selectedIds" multiple filterable placeholder="输入编码或名称添加项目"><el-option v-for="item in catalogs[activeOrderType]" :key="item.id" :label="`${item.code} · ${item.name} · ¥${item.price}`" :value="item.id" /></el-select></div>
+        <template #header><div class="section-title"><strong>{{ orderConfig[activeOrderType].label }}申请</strong></div></template>
+        <div class="catalog-toolbar"><el-select v-model="orderForms[activeOrderType].selectedIds" multiple filterable placeholder="输入编码或名称添加项目"><el-option v-for="item in catalogs[activeOrderType]" :key="item.id" :label="`${item.code} · ${item.name} · ¥${item.price}`" :value="item.id" /></el-select><div class="amount-badge">项目金额：¥{{ selectedOrderTotal.toFixed(2) }}</div></div>
         <el-table :data="selectedOrderItems" stripe><el-table-column prop="code" :label="`${orderConfig[activeOrderType].label}编码`" width="150" /><el-table-column prop="name" :label="`${orderConfig[activeOrderType].label}名称`" min-width="180" /><el-table-column prop="format" label="规格" width="140" /><el-table-column prop="price" label="单价" width="110"><template #default="scope">¥{{ Number(scope.row.price).toFixed(2) }}</template></el-table-column><el-table-column prop="category" label="费用分类" width="130" /><el-table-column label="操作" width="90"><template #default="scope"><el-button link type="danger" @click="orderForms[activeOrderType!].selectedIds = orderForms[activeOrderType!].selectedIds.filter(id => id !== scope.row.id)">删除</el-button></template></el-table-column><template #empty><el-empty :description="`暂未添加${orderConfig[activeOrderType].label}项目`" /></template></el-table>
         <div class="medical-order"><h4>医嘱</h4><el-form label-width="90px"><el-form-item label="目的要求"><el-input v-model="orderForms[activeOrderType].info" type="textarea" :rows="3" :placeholder="orderConfig[activeOrderType].purpose" /></el-form-item><el-form-item :label="`${orderConfig[activeOrderType].label}部位`"><el-input v-model="orderForms[activeOrderType].position" type="textarea" :rows="2" /></el-form-item><el-form-item label="备注"><el-input v-model="orderForms[activeOrderType].remark" type="textarea" :rows="2" /></el-form-item></el-form><div class="form-actions"><el-button @click="Object.assign(orderForms[activeOrderType!], { selectedIds: [], info: '', position: '', remark: '' })">清空</el-button><el-button type="primary" @click="submitOrder">保存申请</el-button></div></div>
       </el-card>
 
       <el-card v-if="currentVisit && (currentPage === 'checkResult' || currentPage === 'inspectionResult')" shadow="never" class="business-card page-card">
-        <template #header><div class="section-title"><strong>{{ heading.title }}</strong><span>医技执行结果</span></div></template>
+        <template #header><div class="section-title"><strong>{{ heading.title }}</strong></div></template>
         <el-table :data="resultRows" stripe highlight-current-row @row-click="selectedResult = $event"><el-table-column prop="itemCode" label="项目编码" width="140" /><el-table-column prop="itemName" label="项目名称" min-width="180" /><el-table-column label="状态" width="110"><template #default="scope"><el-tag :type="scope.row.status === 'COMPLETED' ? 'success' : 'warning'">{{ paymentStateLabel(scope.row.status) }}</el-tag></template></el-table-column><el-table-column prop="executor" label="执行人员" width="120" /><el-table-column prop="executedAt" label="执行时间" width="180" /><el-table-column label="操作" width="100"><template #default="scope"><el-button link type="primary" @click.stop="selectedResult = scope.row">查看详情</el-button></template></el-table-column><template #empty><el-empty :description="`暂无${heading.title}`" /></template></el-table>
-        <div class="result-detail"><h4>{{ heading.title }}详情</h4><el-descriptions v-if="selectedResult" :column="2" border><el-descriptions-item label="项目名称">{{ selectedResult.itemName }}</el-descriptions-item><el-descriptions-item label="项目编码">{{ selectedResult.itemCode }}</el-descriptions-item><el-descriptions-item label="执行人员">{{ selectedResult.executor || '-' }}</el-descriptions-item><el-descriptions-item label="执行时间">{{ selectedResult.executedAt || '-' }}</el-descriptions-item><el-descriptions-item label="执行状态"><el-tag :type="selectedResult.status === 'COMPLETED' ? 'success' : 'warning'">{{ paymentStateLabel(selectedResult.status) }}</el-tag></el-descriptions-item><el-descriptions-item label="结果内容" :span="2">{{ selectedResult.result || '尚未录入结果' }}</el-descriptions-item></el-descriptions><el-empty v-else :image-size="55" description="请选择一条结果查看详情" /></div>
+        <div class="result-detail"><h4>{{ heading.title }}详情</h4><el-descriptions v-if="selectedResult" :column="1" border><el-descriptions-item label="项目名称">{{ selectedResult.itemName }}</el-descriptions-item><el-descriptions-item label="项目编码">{{ selectedResult.itemCode }}</el-descriptions-item><el-descriptions-item label="执行人员">{{ selectedResult.executor || '-' }}</el-descriptions-item><el-descriptions-item label="执行时间">{{ selectedResult.executedAt || '-' }}</el-descriptions-item><el-descriptions-item label="执行状态"><el-tag :type="selectedResult.status === 'COMPLETED' ? 'success' : 'warning'">{{ paymentStateLabel(selectedResult.status) }}</el-tag></el-descriptions-item><el-descriptions-item label="结果内容">{{ selectedResult.result || '尚未录入结果' }}</el-descriptions-item></el-descriptions><el-empty v-else :image-size="55" description="请选择一条结果查看详情" /></div>
       </el-card>
 
       <el-card v-if="currentVisit && currentPage === 'diagnosis'" shadow="never" class="business-card page-card">
-        <template #header><div class="section-title"><strong>门诊确诊</strong><span>诊断和处理意见录入</span></div></template>
-        <el-form label-width="110px" label-position="left" class="clinical-form diagnosis-form"><el-form-item label="疾病目录"><el-select v-model="diseaseIds" multiple filterable placeholder="按 ICD 编码或疾病名称选择"><el-option v-for="item in catalogs.disease" :key="item.id" :label="`${item.format} · ${item.name}`" :value="item.id" /></el-select></el-form-item><el-form-item label="诊断结果 *"><el-input v-model="record.diagnosis" type="textarea" :rows="4" placeholder="请输入诊断结果" /></el-form-item><el-form-item label="处理意见"><el-input v-model="record.cure" type="textarea" :rows="4" placeholder="请输入治疗、用药和复诊意见" /></el-form-item><div class="form-actions form-actions-left"><el-button type="primary" @click="saveCurrentDiagnosis">确诊提交</el-button><el-button @click="record.diagnosis = ''; record.cure = ''; diseaseIds = []">重置录入</el-button></div></el-form>
+        <template #header><div class="section-title"><strong>门诊确诊</strong></div></template>
+        <el-form label-width="110px" label-position="left" class="clinical-form diagnosis-form"><el-form-item label="疾病目录"><el-select v-model="diseaseIds" multiple filterable placeholder="按 ICD 编码或疾病名称选择"><el-option v-for="item in catalogs.disease" :key="item.id" :label="`${item.format} · ${item.name}`" :value="item.id" /></el-select></el-form-item><el-form-item label="诊断结果"><el-input v-model="record.diagnosis" type="textarea" :rows="4" placeholder="请输入诊断结果" /></el-form-item><el-form-item label="处理意见"><el-input v-model="record.cure" type="textarea" :rows="4" placeholder="请输入治疗、用药和复诊意见" /></el-form-item><div class="form-actions form-actions-left"><el-button type="primary" @click="saveCurrentDiagnosis">确诊提交</el-button><el-button @click="record.diagnosis = ''; record.cure = ''; diseaseIds = []">重置录入</el-button></div></el-form>
       </el-card>
 
       <el-card v-if="currentVisit && currentPage === 'prescription'" shadow="never" class="business-card page-card">
-        <template #header><div class="section-title"><strong>开设处方</strong><span>处方明细</span><div class="amount-badge">处方金额：¥{{ prescriptionTotal.toFixed(2) }}</div></div></template>
-        <div class="prescription-tools"><el-button type="primary" plain @click="addPrescriptionLine"><el-icon><Plus /></el-icon>添加药品</el-button></div>
-        <el-table :data="prescriptionLines" stripe><el-table-column label="药品名称" min-width="220"><template #default="scope"><el-select v-model="scope.row.drugId" filterable placeholder="输入药品编码或名称"><el-option v-for="drug in catalogs.drug" :key="drug.id" :label="`${drug.code} · ${drug.name}`" :value="drug.id" /></el-select></template></el-table-column><el-table-column label="规格" min-width="150"><template #default="scope">{{ drugOf(scope.row.drugId)?.format || '-' }}</template></el-table-column><el-table-column label="单价" width="100"><template #default="scope">¥{{ Number(drugOf(scope.row.drugId)?.price || 0).toFixed(2) }}</template></el-table-column><el-table-column label="用法用量" min-width="250"><template #default="scope"><el-input v-model="scope.row.usage" placeholder="如：口服，一日3次，一次1粒" /></template></el-table-column><el-table-column label="数量" width="150"><template #default="scope"><el-input-number v-model="scope.row.quantity" :min="0.001" :precision="3" /></template></el-table-column><el-table-column label="金额" width="110"><template #default="scope">¥{{ (Number(drugOf(scope.row.drugId)?.price || 0) * scope.row.quantity).toFixed(2) }}</template></el-table-column><el-table-column label="操作" width="80"><template #default="scope"><el-button link type="danger" @click="removePrescriptionLine(scope.$index)">删除</el-button></template></el-table-column></el-table>
-        <div class="form-actions"><el-button @click="prescriptionLines = [{ drugId: 0, usage: '', quantity: 1 }]">重置处方</el-button><el-button type="primary" @click="submitPrescription">开立处方</el-button></div>
+        <template #header><div class="section-title"><strong>开设处方</strong></div></template>
+        <div class="prescription-toolbar"><el-button type="primary" plain @click="openDrugDialog"><el-icon><Plus /></el-icon>添加药品</el-button><div class="amount-badge">处方金额：¥{{ prescriptionTotal.toFixed(2) }}</div></div>
+        <el-table :data="prescriptionLines" stripe><el-table-column label="药品名称" min-width="190"><template #default="scope"><div class="drug-name"><strong>{{ drugOf(scope.row.drugId)?.name }}</strong><span>{{ drugOf(scope.row.drugId)?.code }}</span></div></template></el-table-column><el-table-column label="规格" min-width="150"><template #default="scope">{{ drugOf(scope.row.drugId)?.format || '-' }}</template></el-table-column><el-table-column label="单价" width="100"><template #default="scope">¥{{ Number(drugOf(scope.row.drugId)?.price || 0).toFixed(2) }}</template></el-table-column><el-table-column label="用法用量" min-width="250"><template #default="scope"><el-input v-model="scope.row.usage" placeholder="请输入用法、用量和频次" /></template></el-table-column><el-table-column label="数量" width="150"><template #default="scope"><el-input-number v-model="scope.row.quantity" :min="0.001" :precision="3" /></template></el-table-column><el-table-column label="金额" width="110"><template #default="scope">¥{{ (Number(drugOf(scope.row.drugId)?.price || 0) * scope.row.quantity).toFixed(2) }}</template></el-table-column><el-table-column label="操作" width="80"><template #default="scope"><el-button link type="danger" @click="removePrescriptionLine(scope.$index)">删除</el-button></template></el-table-column><template #empty><el-empty description="请通过添加药品选择处方药品" /></template></el-table>
+        <div class="form-actions"><el-button @click="prescriptionLines = []">重置处方</el-button><el-button type="primary" @click="submitPrescription">开立处方</el-button></div>
       </el-card>
 
       <el-card v-if="currentVisit && currentPage === 'costs'" shadow="never" class="business-card page-card">
-        <template #header><div class="section-title"><strong>费用记录查询</strong><span>按患者信息查询本次诊疗费用</span></div></template>
+        <template #header><div class="section-title"><strong>费用记录查询</strong></div></template>
         <div class="cost-query"><h4>患者信息查询</h4><el-form inline><el-form-item label="病历号"><el-input v-model="costCaseNumber" placeholder="请输入病历号" clearable /></el-form-item><el-form-item label="患者姓名"><el-input v-model="costPatientName" placeholder="请输入患者姓名" clearable /></el-form-item><el-form-item><el-button type="primary" @click="queryCostPatient">搜索</el-button></el-form-item></el-form></div>
         <h4 class="cost-confirm-title">患者信息确认</h4>
         <div class="cost-patient-confirm"><div><span>患者姓名</span><strong>{{ currentVisit.patientName }}</strong></div><div><span>病历号</span><strong>{{ currentVisit.caseNumber }}</strong></div><div><span>年龄</span><strong>{{ currentVisit.age }}{{ currentVisit.ageType }}</strong></div><div><span>性别</span><strong>{{ currentVisit.gender }}</strong></div></div>
@@ -299,10 +305,15 @@ function statusType(status: string) { return status === 'UNPAID' ? 'warning' : s
         <el-table :data="costs" stripe><el-table-column label="类型" width="100"><template #default="scope"><el-tag effect="plain">{{ orderTypeLabel(scope.row.type) }}</el-tag></template></el-table-column><el-table-column prop="itemName" label="项目名称" min-width="190" /><el-table-column label="单价" width="100"><template #default="scope">¥{{ Number(scope.row.unitPrice).toFixed(2) }}</template></el-table-column><el-table-column prop="quantity" label="数量" width="90" /><el-table-column label="金额" width="110"><template #default="scope">¥{{ Number(scope.row.amount).toFixed(2) }}</template></el-table-column><el-table-column prop="createdAt" label="开立时间" width="180" /><el-table-column label="状态" width="110"><template #default="scope"><el-tag :type="statusType(scope.row.status)">{{ paymentStateLabel(scope.row.status) }}</el-tag></template></el-table-column><el-table-column label="操作" width="90"><template #default="scope"><el-button v-if="scope.row.status === 'UNPAID'" link type="danger" @click="cancelCost(scope.row)">作废</el-button><span v-else>-</span></template></el-table-column><template #empty><el-empty description="暂无费用项目" /></template></el-table>
       </el-card>
     </template>
+
+    <el-dialog v-model="drugDialogVisible" title="添加药品" width="760px">
+      <div class="drug-search"><el-select v-model="drugSearchMode"><el-option label="药品编码" value="code" /><el-option label="药品名称" value="name" /></el-select><el-input v-model="drugKeyword" placeholder="请输入检索内容" clearable><template #prefix><el-icon><Search /></el-icon></template></el-input><el-button type="primary">搜索</el-button></div>
+      <el-table :data="filteredDrugs" row-key="id" max-height="420" @selection-change="handleDrugSelection"><el-table-column type="selection" width="48" /><el-table-column prop="code" label="药品编码" width="120" /><el-table-column prop="name" label="药品名称" min-width="150" /><el-table-column prop="format" label="药品规格" width="150" /><el-table-column prop="price" label="药品单价" width="100"><template #default="scope">¥{{ Number(scope.row.price).toFixed(2) }}</template></el-table-column><el-table-column prop="unit" label="单位" width="70" /><el-table-column prop="stock" label="库存" width="80" /></el-table>
+      <template #footer><el-button @click="drugDialogVisible = false">关闭</el-button><el-button type="primary" @click="addSelectedDrugs">添加</el-button></template>
+    </el-dialog>
   </section>
 </template>
 
 <style scoped>
-.doctor-module{max-width:1600px;margin:0 auto}.patient-overview{display:flex;gap:16px;margin-bottom:18px}.patient-overview article{width:220px;padding:16px 20px;display:flex;align-items:center;gap:15px;border:1px solid var(--glass-edge);border-radius:16px;background:rgba(255,255,255,.62);box-shadow:var(--glass-shadow-soft)}.patient-overview .el-icon{width:38px;height:38px;border-radius:10px;color:var(--glass-accent);background:rgba(8,127,145,.1);font-size:20px}.patient-overview strong,.patient-overview span{display:block}.patient-overview strong{font-size:23px}.patient-overview span{margin-top:3px;color:var(--glass-muted);font-size:12px}.patient-list-card :deep(.el-card__body),.page-card :deep(.el-card__body){padding:20px}.patient-filter{display:grid;grid-template-columns:minmax(320px,1fr) auto 90px;gap:12px;margin-bottom:18px}.patient-info-card{margin-bottom:18px;border:1px solid var(--glass-edge)!important;background:rgba(255,255,255,.58)!important}.patient-info-card :deep(.el-card__body){display:flex;align-items:center;gap:24px;padding:14px 20px}.patient-info-label{padding-right:20px;border-right:1px solid var(--glass-line);font-weight:700}.patient-chip span,.patient-chip strong{display:block}.patient-chip span{color:var(--glass-muted);font-size:10px}.patient-chip strong{margin-top:4px;font-size:13px}.patient-switch{width:230px;margin-left:auto}.section-title{display:flex;align-items:center;gap:12px;width:100%}.section-title strong{font-size:17px}.section-title span{color:var(--glass-muted);font-size:11px}.amount-badge{margin-left:auto;padding:8px 13px;border-radius:8px;color:#fff;background:var(--glass-accent);font-size:12px}.clinical-form{max-width:1120px;margin:0 auto}.catalog-picker,.prescription-tools{display:flex;justify-content:flex-end;margin-bottom:15px}.catalog-picker .el-select{width:520px}.medical-order{margin-top:20px;padding-top:16px;border-top:1px solid var(--glass-line)}.medical-order h4{margin:0 0 16px}.form-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}.diagnosis-form .el-select,.prescription-tools+.el-table .el-select{width:100%}.cost-patient-confirm{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;margin-bottom:18px;overflow:hidden;border:1px solid var(--glass-line);border-radius:10px;background:var(--glass-line)}.cost-patient-confirm div{padding:12px 16px;background:rgba(255,255,255,.7)}.cost-patient-confirm span,.cost-patient-confirm strong{display:block}.cost-patient-confirm span{color:var(--glass-muted);font-size:10px}.cost-patient-confirm strong{margin-top:5px;font-size:13px}@media(max-width:1280px){.patient-info-card :deep(.el-card__body){gap:14px}.patient-chip:nth-of-type(5){display:none}.catalog-picker .el-select{width:420px}}
-.record-sheet{max-width:none}.record-sheet :deep(.el-form-item){margin-bottom:10px}.record-sheet :deep(.el-form-item__label){height:auto;min-height:58px;align-items:center;padding:0 14px;border:1px solid var(--glass-line);border-right:0;border-radius:8px 0 0 8px;background:rgba(240,245,247,.7)}.record-sheet :deep(.el-form-item__content){min-width:0}.record-sheet :deep(.el-textarea__inner){border-radius:0 8px 8px 0}.record-disease{width:100%;padding:10px;border:1px solid var(--glass-line);border-radius:0 8px 8px 0}.record-disease>.el-select{width:100%;margin-bottom:10px}.result-detail{margin-top:22px;padding-top:18px;border-top:1px solid var(--glass-line)}.result-detail h4{margin:0 0 14px}.form-actions-left{justify-content:flex-start;padding-left:110px}.cost-query{padding:4px 0 16px;border-bottom:1px solid var(--glass-line)}.cost-query h4,.cost-confirm-title{margin:0 0 14px}.cost-query :deep(.el-form-item){margin-bottom:0}.cost-query :deep(.el-input){width:260px}.cost-confirm-title{margin-top:18px}.cost-summary{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding:10px 14px;border-radius:8px;color:var(--glass-muted);background:rgba(8,127,145,.07)}.cost-summary strong{color:var(--glass-accent)}
+.doctor-module{--el-color-primary:var(--glass-accent);max-width:1600px;margin:0 auto}.doctor-module :deep(.page-heading p){display:none}.patient-overview{display:flex;gap:16px;margin-bottom:18px}.patient-overview article{width:220px;padding:16px 20px;display:flex;align-items:center;gap:15px;border:1px solid var(--glass-edge);border-radius:16px;background:rgba(255,255,255,.62);box-shadow:var(--glass-shadow-soft)}.patient-overview .el-icon{width:38px;height:38px;border-radius:10px;color:var(--glass-accent);background:rgba(8,127,145,.1);font-size:20px}.patient-overview strong,.patient-overview span{display:block}.patient-overview strong{font-size:23px}.patient-overview span{margin-top:3px;color:var(--glass-muted);font-size:12px}.patient-list-card :deep(.el-card__body),.page-card :deep(.el-card__body){padding:20px}.patient-filter{display:grid;grid-template-columns:minmax(320px,1fr) auto 90px;gap:12px;margin-bottom:18px}.doctor-module :deep(.el-radio-button__inner:hover){color:var(--glass-accent)}.patient-info-card{margin-bottom:18px;border:1px solid var(--glass-edge)!important;background:rgba(255,255,255,.58)!important}.patient-info-card :deep(.el-card__body){display:flex;align-items:center;gap:24px;padding:14px 20px}.patient-info-label{padding-right:20px;border-right:1px solid var(--glass-line);font-weight:700}.patient-chip span,.patient-chip strong{display:block}.patient-chip span{color:var(--glass-muted);font-size:10px}.patient-chip strong{margin-top:4px;font-size:13px}.patient-switch{width:230px;margin-left:auto}.section-title{display:flex;align-items:center;width:100%}.section-title strong{font-size:17px}.amount-badge{padding:8px 13px;border-radius:8px;color:#fff;background:var(--glass-accent);font-size:12px;white-space:nowrap}.clinical-form{max-width:1120px;margin:0 auto}.catalog-toolbar,.prescription-toolbar{display:flex;align-items:center;gap:14px;margin-bottom:15px}.catalog-toolbar .el-select{flex:1}.catalog-toolbar .amount-badge,.prescription-toolbar .amount-badge{margin-left:auto}.medical-order{margin-top:20px;padding-top:16px;border-top:1px solid var(--glass-line)}.medical-order h4{margin:0 0 16px}.record-order{margin-top:0;padding-top:0;border-top:0}.record-disease{width:100%}.record-disease>.el-select{width:100%;margin-bottom:10px}.form-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}.diagnosis-form .el-select{width:100%}.result-detail{margin-top:22px;padding-top:18px;border-top:1px solid var(--glass-line)}.result-detail h4{margin:0 0 14px}.result-detail :deep(.el-descriptions__label){width:150px}.form-actions-left{justify-content:flex-start;padding-left:110px}.drug-name strong,.drug-name span{display:block}.drug-name span{margin-top:3px;color:var(--glass-muted);font-size:10px}.drug-search{display:grid;grid-template-columns:140px 1fr 80px;gap:10px;margin-bottom:16px}.cost-patient-confirm{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;margin-bottom:18px;overflow:hidden;border:1px solid var(--glass-line);border-radius:10px;background:var(--glass-line)}.cost-patient-confirm div{padding:12px 16px;background:rgba(255,255,255,.7)}.cost-patient-confirm span,.cost-patient-confirm strong{display:block}.cost-patient-confirm span{color:var(--glass-muted);font-size:10px}.cost-patient-confirm strong{margin-top:5px;font-size:13px}.cost-query{padding:4px 0 16px;border-bottom:1px solid var(--glass-line)}.cost-query h4,.cost-confirm-title{margin:0 0 14px}.cost-query :deep(.el-form-item){margin-bottom:0}.cost-query :deep(.el-input){width:260px}.cost-confirm-title{margin-top:18px}.cost-summary{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding:10px 14px;border-radius:8px;color:var(--glass-muted);background:rgba(8,127,145,.07)}.cost-summary strong{color:var(--glass-accent)}@media(max-width:1280px){.patient-info-card :deep(.el-card__body){gap:14px}.patient-chip:nth-of-type(5){display:none}}
 </style>
