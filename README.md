@@ -2,36 +2,32 @@
 
 云医院HIS门诊管理系统，面向挂号收费员、门诊医生、医技人员和药房工作人员，覆盖挂号、接诊、收费、检查检验、处置及发退药流程。
 
-## 快速启动
+## 本地开发
 
 需要 JDK 17、Maven 3.9、Node.js 20+、MySQL 8 和 Redis。
 
-### 1. 初始化数据库
+### 首次初始化（只需一次）
 
-依次执行 `sql/his_cloud.sql`、`sql/ruoyi_system.sql`、`sql/quartz.sql`。后两个脚本需在 `his_cloud_completed` 数据库中执行。
+1. 依次执行 `sql/his_cloud.sql`、`sql/ruoyi_system.sql`、`sql/quartz.sql`。后两个脚本需在 `his_cloud_completed` 数据库中执行。
+2. 在 `frontend` 目录复制 `.env.example` 为 `.env.development`，然后执行 `npm install`。
+3. 启动 MySQL 和 Redis。数据库账号不是默认的 `root/password` 时，设置 `HIS_DB_USERNAME`、`HIS_DB_PASSWORD` 等环境变量。
 
-### 2. 启动后端
+数据库脚本不需要每天重复执行，只有新建或重置数据库时才需要重新导入。
 
-默认连接本机 MySQL、Redis，MySQL 账号为 `root/password`。配置不同时通过 `HIS_DB_USERNAME`、`HIS_DB_PASSWORD`、`HIS_REDIS_HOST` 等环境变量覆盖。
+### 日常启动
 
-```bash
-cd backend
-mvn -pl ruoyi-admin -am clean package -DskipTests
-java -jar ruoyi-admin/target/ruoyi-admin.jar
-```
+- 后端：在 IDEA 中运行 `backend/ruoyi-admin` 下的 `RuoYiApplication`。
+- 前端：在 `frontend` 目录执行：
 
-后端地址为 `http://localhost:8080`，默认账号为 `admin/admin123`。
-
-### 3. 启动前端
-
-```bash
-cd frontend
-cp .env.example .env.development
-npm install
+```text
 npm run dev
 ```
 
-`.env.example` 默认使用模拟认证。与后端联调时，将本地 `.env.development` 中的 `VITE_USE_MOCK_AUTH` 改为 `false`；该本地配置不会提交到 Git。
+后端地址为 `http://localhost:8080`，默认账号为 `admin/admin123`。与后端联调时，将 `.env.development` 中的 `VITE_USE_MOCK_AUTH` 改为 `false`。
+
+### 命令行启动后端（可选）
+
+不使用 IDEA 时，首次在 `backend` 目录执行一次 `mvn install -DskipTests`，以后进入 `backend/ruoyi-admin` 执行 `mvn spring-boot:run` 即可。
 
 ## 前端效果图
 
