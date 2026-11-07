@@ -258,7 +258,7 @@ function statusType(status: string) { return status === 'UNPAID' ? 'warning' : s
 
       <el-card v-if="currentVisit && currentPage === 'record'" shadow="never" class="business-card page-card">
         <template #header><div class="section-title"><strong>病历首页</strong></div></template>
-        <div class="medical-order record-order"><h4>病历内容</h4><el-form label-width="90px" class="clinical-form">
+        <div class="medical-order record-order"><el-form label-width="120px" class="clinical-form">
           <el-form-item label="主诉"><el-input v-model="record.readme" type="textarea" :rows="2" placeholder="请输入主诉" /></el-form-item>
           <el-form-item label="现病史"><el-input v-model="record.present" type="textarea" :rows="2" placeholder="请输入现病史" /></el-form-item>
           <el-form-item label="现病治疗情况"><el-input v-model="record.presentTreat" type="textarea" :rows="2" placeholder="请输入现病治疗情况" /></el-form-item>
