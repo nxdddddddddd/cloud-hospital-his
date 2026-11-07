@@ -2,28 +2,17 @@
 
 云医院HIS门诊管理系统，面向挂号收费员、门诊医生、医技人员和药房工作人员，覆盖挂号、接诊、收费、检查检验、处置及发退药流程。
 
-## 技术栈
+## 快速启动
 
-- 前端：Vue 3、Element Plus、Axios、Pinia
-- 后端：RuoYi 3.9.2、Spring Boot 4、MyBatis
-- 数据库：MySQL 8、Redis
+需要 JDK 17、Maven 3.9、Node.js 20+、MySQL 8 和 Redis。
 
-## 目录
+### 1. 初始化数据库
 
-```text
-backend/   RuoYi后端及HIS业务模块
-docs/      项目需求与协作规范
-frontend/ Vue 3 前端工程
-sql/       数据库脚本
-```
+依次执行 `sql/his_cloud.sql`、`sql/ruoyi_system.sql`、`sql/quartz.sql`。后两个脚本需在 `his_cloud_completed` 数据库中执行。
 
-## 后端启动
+### 2. 启动后端
 
-环境要求：JDK 17、Maven 3.9、MySQL 8、Redis。
-
-1. 按顺序执行 `sql/his_cloud.sql`、`sql/ruoyi_system.sql`、`sql/quartz.sql`，后两个脚本需在 `his_cloud_completed` 数据库中执行。
-2. 按需设置 `HIS_DB_URL`、`HIS_DB_USERNAME`、`HIS_DB_PASSWORD`、`HIS_REDIS_HOST`、`HIS_REDIS_PORT` 等环境变量。
-3. 构建并启动：
+默认连接本机 MySQL、Redis，MySQL 账号为 `root/password`。配置不同时通过 `HIS_DB_USERNAME`、`HIS_DB_PASSWORD`、`HIS_REDIS_HOST` 等环境变量覆盖。
 
 ```bash
 cd backend
@@ -31,17 +20,18 @@ mvn -pl ruoyi-admin -am clean package -DskipTests
 java -jar ruoyi-admin/target/ruoyi-admin.jar
 ```
 
-默认服务端口为 `8080`。登录后可访问 `GET /his/status` 检查HIS业务模块状态。
+后端地址为 `http://localhost:8080`，默认账号为 `admin/admin123`。
 
-## 前端启动
+### 3. 启动前端
 
 ```bash
 cd frontend
+cp .env.example .env.development
 npm install
 npm run dev
 ```
 
-开发环境默认启用模拟登录，可直接使用页面预填账号进入工作台。连接RuoYi后端时，将 `.env.development` 中的 `VITE_USE_MOCK_AUTH` 改为 `false`，并配置后端代理地址。
+`.env.example` 默认使用模拟认证。与后端联调时，将本地 `.env.development` 中的 `VITE_USE_MOCK_AUTH` 改为 `false`；该本地配置不会提交到 Git。
 
 ## 前端效果图
 
