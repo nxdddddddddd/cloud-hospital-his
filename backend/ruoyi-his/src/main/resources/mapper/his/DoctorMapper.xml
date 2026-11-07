@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.his.mapper.DoctorMapper">
+    <select id="selectEmployeeIdByUserId" resultType="long">
+        select id from employee where sys_user_id = #{userId} and delmark = 1 limit 1
+    </select>
+
+    <select id="selectVisits" resultType="java.util.LinkedHashMap">
+        select r.id as registrationId, r.case_number as caseNumber, r.real_name as patientName,
+               r.gender, r.age, r.age_type as ageType, r.card_number as cardNumber,
+               r.home_address as homeAddress, r.noon, r.visit_state as visitState,
+               date_format(r.visit_date, '%Y-%m-%d') as visitDate,
+               d.dept_name as departmentName, sc.settle_name as settlementName,
+               mr.allergy, mr.diagnosis
+        from register r
+        join department d on d.id = r.deptment_id
+        join settle_category sc on sc.id = r.settle_category_id
+        left join medical_record mr on mr.register_id = r.id
+        where r.employee_id = #{employeeId} and r.visit_state in (1, 2, 3)
+        <choose>
+            <when test="state == 'waiting'">and r.visit_state in (1, 2)</when>
+            <when test="state == 'completed'">and r.visit_state = 3</when>
+        </choose>
+        <if test="keyword != null and keyword != ''">
+            and (r.real_name like concat('%', #{keyword}, '%')
+              or r.case_number like concat('%', #{keyword}, '%')
+              or r.card_number like concat('%', #{keyword}, '%'))
+        </if>
+        order by r.visit_date desc, field(r.visit_state, 2, 1, 3), r.id
+    </select>
+
+    <select id="countOwnedRegistration" resultType="int">
+        select count(*) from register where id = #{registrationId} and employee_id = #{employeeId}
+          and visit_state in (1, 2, 3)
+    </select>
+
+    <select id="countActiveRegistration" resultType="int">
+        select count(*) from register where id = #{registrationId} and employee_id = #{employeeId}
+          and visit_state = 2
+    </select>
+
+    <update id="acceptRegistration">
+        update register set visit_state = 2
+        where id = #{registrationId} and employee_id = #{employeeId} and visit_state = 1
+    </update>
+
+    <select id="selectMedicalRecord" resultType="java.util.LinkedHashMap">
+        select mr.id, mr.register_id as registrationId, mr.readme, mr.present,
+               mr.present_treat as presentTreat, mr.history, mr.allergy, mr.physique,
+               mr.proposal, mr.careful, mr.diagnosis, mr.cure,
+               group_concat(mrd.disease_id order by mrd.disease_id) as diseaseIds
+        from medical_record mr
+        left join medical_record_disease mrd on mrd.medical_record_id = mr.id
+        where mr.register_id = #{registrationId}
+        group by mr.id
+    </select>
+
+    <insert id="upsertMedicalRecord">
+        insert into medical_record(register_id, readme, present, present_treat, history,
+          allergy, physique, proposal, careful)
+        values(#{registrationId}, #{readme}, #{present}, #{presentTreat}, #{history},
+          #{allergy}, #{physique}, #{proposal}, #{careful})
+        on duplicate key update readme = values(readme), present = values(present),
+          present_treat = values(present_treat), history = values(history), allergy = values(allergy),
+          physique = values(physique), proposal = values(proposal), careful = values(careful)
+    </insert>
+
+    <select id="selectMedicalRecordId" resultType="long">
+        select id from medical_record where register_id = #{registrationId}
+    </select>
+
+    <select id="selectCatalog" resultType="java.util.LinkedHashMap">
+        <choose>
+            <when test="type == 'DRUG'">
+                select d.id, d.drug_code as code, d.drug_name as name, d.drug_format as format,
+                       d.drug_unit as unit, d.drug_price as price, d.manufacturer,
+                       coalesce(s.on_hand, 0) as stock
+                from drug_info d left join drug_stock s on s.drug_id = d.id
+                <if test="keyword != null and keyword != ''">
+                    where d.drug_name like concat('%', #{keyword}, '%')
+                       or d.drug_code like concat('%', #{keyword}, '%')
+                       or d.mnemonic_code like concat('%', #{keyword}, '%')
+                </if>
+                order by d.drug_code
+            </when>
+            <when test="type == 'DISEASE'">
+                select id, disease_code as code, disease_name as name, diseaseICD as format,
+                       disease_category as category
+                from disease
+                <if test="keyword != null and keyword != ''">
+                    where disease_name like concat('%', #{keyword}, '%')
+                       or disease_code like concat('%', #{keyword}, '%')
+                       or diseaseICD like concat('%', #{keyword}, '%')
+                </if>
+                order by disease_code
+            </when>
+            <otherwise>
+                select mt.id, mt.tech_code as code, mt.tech_name as name, mt.tech_format as format,
+                       mt.tech_price as price, mt.price_type as category, d.dept_name as department
+                from medical_technology mt join department d on d.id = mt.deptment_id
+                where mt.tech_type = #{type}
+                <if test="keyword != null and keyword != ''">
+                    and (mt.tech_name like concat('%', #{keyword}, '%')
+                      or mt.tech_code like concat('%', #{keyword}, '%'))
+                </if>
+                order by mt.tech_code
+            </otherwise>
+        </choose>
+    </select>
+
+    <insert id="insertMedicalOrder">
+        insert into ${tableName}(register_id, medical_technology_id, ${fieldPrefix}_info,
+          ${fieldPrefix}_position, ${fieldPrefix}_remark, created_by, unit_price,
+          request_key, request_hash, line_no)
+        select #{registrationId}, mt.id, #{info}, #{position}, #{remark}, #{employeeId},
+               mt.tech_price, #{requestKey}, #{requestHash}, #{lineNo}
+        from medical_technology mt
+        where mt.id = #{medicalTechnologyId} and mt.tech_type = #{techType}
+    </insert>
+
+    <insert id="insertPrescription">
+        insert into prescription(register_id, drug_id, drug_usage, drug_number, created_by,
+          unit_price, request_key, request_hash, line_no)
+        select #{registrationId}, d.id, #{usage}, #{quantity}, #{employeeId}, d.drug_price,
+               #{requestKey}, #{requestHash}, #{lineNo}
+        from drug_info d where d.id = #{drugId}
+    </insert>
+
+    <update id="cancelOrder">
+        update ${tableName} set ${stateField} = 'CANCELLED'
+        where id = #{id} and created_by = #{employeeId} and ${stateField} = 'UNPAID'
+    </update>
+
+    <select id="selectResults" resultType="java.util.LinkedHashMap">
+        select 'check' as type, cr.id, mt.tech_code as itemCode, mt.tech_name as itemName,
+               cr.check_state as status, cr.check_result as result,
+               executor.realname as executor, date_format(cr.check_time, '%Y-%m-%d %H:%i:%s') as executedAt
+        from check_request cr join medical_technology mt on mt.id = cr.medical_technology_id
+        left join employee executor on executor.id = cr.check_employee_id
+        where cr.register_id = #{registrationId}
+        union all
+        select 'inspection', ir.id, mt.tech_code, mt.tech_name, ir.inspection_state,
+               ir.inspection_result, executor.realname,
+               date_format(ir.inspection_time, '%Y-%m-%d %H:%i:%s')
+        from inspection_request ir join medical_technology mt on mt.id = ir.medical_technology_id
+        left join employee executor on executor.id = ir.inspection_employee_id
+        where ir.register_id = #{registrationId}
+        order by id desc
+    </select>
+
+    <update id="updateDiagnosis">
+        update medical_record set diagnosis = #{diagnosis}, cure = #{cure}
+        where register_id = #{registrationId}
+    </update>
+
+    <delete id="deleteRecordDiseases">
+        delete from medical_record_disease where medical_record_id = #{medicalRecordId}
+    </delete>
+
+    <insert id="insertRecordDisease">
+        insert into medical_record_disease(medical_record_id, disease_id)
+        select #{medicalRecordId}, id from disease where id = #{diseaseId}
+    </insert>
+
+    <update id="completeRegistration">
+        update register r set r.visit_state = 3
+        where r.id = #{registrationId} and r.employee_id = #{employeeId} and r.visit_state = 2
+          and exists(select 1 from medical_record mr where mr.register_id = r.id
+            and mr.diagnosis is not null and char_length(trim(mr.diagnosis)) > 0)
+    </update>
+
+    <select id="selectCosts" resultType="java.util.LinkedHashMap">
+        select 'CHECK' as type, cr.id, mt.tech_name as itemName, 1 as quantity,
+               cr.unit_price as unitPrice, cr.unit_price as amount, cr.check_state as status,
+               date_format(cr.creation_time, '%Y-%m-%d %H:%i:%s') as createdAt
+        from check_request cr join medical_technology mt on mt.id = cr.medical_technology_id
+        where cr.register_id = #{registrationId}
+        union all
+        select 'INSPECTION', ir.id, mt.tech_name, 1, ir.unit_price, ir.unit_price,
+               ir.inspection_state, date_format(ir.creation_time, '%Y-%m-%d %H:%i:%s')
+        from inspection_request ir join medical_technology mt on mt.id = ir.medical_technology_id
+        where ir.register_id = #{registrationId}
+        union all
+        select 'DISPOSAL', dr.id, mt.tech_name, 1, dr.unit_price, dr.unit_price,
+               dr.disposal_state, date_format(dr.creation_time, '%Y-%m-%d %H:%i:%s')
+        from disposal_request dr join medical_technology mt on mt.id = dr.medical_technology_id
+        where dr.register_id = #{registrationId}
+        union all
+        select 'PRESCRIPTION', p.id, d.drug_name, p.drug_number, p.unit_price,
+               round(p.drug_number * p.unit_price, 2), p.drug_state,
+               date_format(p.creation_time, '%Y-%m-%d %H:%i:%s')
+        from prescription p join drug_info d on d.id = p.drug_id
+        where p.register_id = #{registrationId}
+        order by createdAt desc, id desc
+    </select>
+</mapper>

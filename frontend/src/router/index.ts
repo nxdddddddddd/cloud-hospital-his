@@ -17,8 +17,19 @@ export const constantRoutes: RouteRecordRaw[] = [
     children: [{ path: 'window', name: 'Registration', component: () => import('@/views/registration/index.vue'), meta: { title: '窗口挂号', permission: 'his:registration:list' } }]
   },
   {
-    path: '/doctor', component: Layout, redirect: '/doctor/workstation', meta: { title: '医生工作站', icon: 'FirstAidKit', permission: 'his:doctor:visits' },
-    children: [{ path: 'workstation', name: 'DoctorWorkstation', component: () => import('@/views/doctor/index.vue'), meta: { title: '门诊诊疗', permission: 'his:doctor:visits' } }]
+    path: '/doctor', component: Layout, redirect: '/doctor/patients', meta: { title: '医生工作站', icon: 'FirstAidKit', permission: 'his:doctor:visits' },
+    children: [
+      { path: 'patients', name: 'DoctorPatients', component: () => import('@/views/doctor/index.vue'), props: { initialTab: 'patients' }, meta: { title: '患者查看', permission: 'his:doctor:visits' } },
+      { path: 'record', name: 'DoctorRecord', component: () => import('@/views/doctor/index.vue'), props: { initialTab: 'record' }, meta: { title: '病历首页', permission: 'his:doctor:visits' } },
+      { path: 'check', name: 'DoctorCheck', component: () => import('@/views/doctor/index.vue'), props: { initialTab: 'check' }, meta: { title: '检查申请', permission: 'his:doctor:visits' } },
+      { path: 'inspection', name: 'DoctorInspection', component: () => import('@/views/doctor/index.vue'), props: { initialTab: 'inspection' }, meta: { title: '检验申请', permission: 'his:doctor:visits' } },
+      { path: 'check-result', name: 'DoctorCheckResult', component: () => import('@/views/doctor/index.vue'), props: { initialTab: 'checkResult' }, meta: { title: '检查结果', permission: 'his:doctor:visits' } },
+      { path: 'inspection-result', name: 'DoctorInspectionResult', component: () => import('@/views/doctor/index.vue'), props: { initialTab: 'inspectionResult' }, meta: { title: '检验结果', permission: 'his:doctor:visits' } },
+      { path: 'diagnosis', name: 'DoctorDiagnosis', component: () => import('@/views/doctor/index.vue'), props: { initialTab: 'diagnosis' }, meta: { title: '门诊确诊', permission: 'his:doctor:visits' } },
+      { path: 'prescription', name: 'DoctorPrescription', component: () => import('@/views/doctor/index.vue'), props: { initialTab: 'prescription' }, meta: { title: '开设处方', permission: 'his:doctor:visits' } },
+      { path: 'disposal', name: 'DoctorDisposal', component: () => import('@/views/doctor/index.vue'), props: { initialTab: 'disposal' }, meta: { title: '处置申请', permission: 'his:doctor:visits' } },
+      { path: 'costs', name: 'DoctorCosts', component: () => import('@/views/doctor/index.vue'), props: { initialTab: 'costs' }, meta: { title: '费用查询', permission: 'his:doctor:visits' } }
+    ]
   },
   {
     path: '/charge', component: Layout, redirect: '/charge/window', meta: { title: '收费管理', icon: 'Wallet', permission: 'his:charge:list' },
