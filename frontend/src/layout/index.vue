@@ -36,6 +36,10 @@ async function handleCommand(command: string) {
               <el-icon><component :is="item.meta?.icon || item.children[0].meta?.icon || 'Menu'" /></el-icon>
               <template #title>{{ item.meta?.title || item.children[0].meta?.title }}</template>
             </el-menu-item>
+            <el-sub-menu v-else-if="item.children?.length" :index="item.path">
+              <template #title><el-icon><component :is="item.meta?.icon || 'Menu'" /></el-icon><span>{{ item.meta?.title }}</span></template>
+              <el-menu-item v-for="child in item.children.filter((route) => !route.meta?.hidden && hasPermission(route.meta?.permission))" :key="child.path" :index="`${item.path}/${child.path}`.replace('//', '/')">{{ child.meta?.title }}</el-menu-item>
+            </el-sub-menu>
           </template>
         </el-menu>
       </el-scrollbar>
