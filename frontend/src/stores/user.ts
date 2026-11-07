@@ -14,7 +14,7 @@ export const useUserStore = defineStore('user', {
         this.token = `mock-${Date.now()}`
       } else {
         const result = await loginApi(form)
-        this.token = result.data.token
+        this.token = result.token
       }
       setToken(this.token)
     },
