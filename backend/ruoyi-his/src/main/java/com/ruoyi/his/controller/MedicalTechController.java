@@ -30,10 +30,9 @@ public class MedicalTechController
     }
 
     @PutMapping("/{category}/{id}/start")
-    public AjaxResult start(@PathVariable String category, @PathVariable Long id,
-        @RequestBody ExecutorRequest request)
+    public AjaxResult start(@PathVariable String category, @PathVariable Long id)
     {
-        service.start(category, id, request.executor());
+        service.start(category, id);
         return AjaxResult.success();
     }
 
@@ -41,10 +40,10 @@ public class MedicalTechController
     public AjaxResult complete(@PathVariable String category, @PathVariable Long id,
         @RequestBody CompletionRequest request)
     {
-        service.complete(category, id, request.executor(), request.result(), request.executedAt());
+        service.complete(category, id, request.result(), request.executedAt());
         return AjaxResult.success();
     }
 
-    public record ExecutorRequest(String executor) { }
-    public record CompletionRequest(String executor, String result, String executedAt) { }
+    /** 执行人员由后端从当前登录用户推导，请求体只包含结果和执行时间。 */
+    public record CompletionRequest(String result, String executedAt) { }
 }

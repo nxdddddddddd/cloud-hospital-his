@@ -24,7 +24,6 @@ export interface MedicalTechFilter {
 }
 
 export interface CompletionInput {
-  executor: string
   executedAt: string
   result: string
 }

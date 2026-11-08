@@ -6,8 +6,8 @@ export async function listMedicalTechOrders(category: MedicalTechCategory, param
   return response.data.map(mapMedicalTechApiOrder)
 }
 
-export async function startMedicalTechOrder(category: MedicalTechCategory, id: string, executor: string) {
-  await request.put(`/his/medical-tech/${category}/${id}/start`, { executor })
+export async function startMedicalTechOrder(category: MedicalTechCategory, id: string) {
+  await request.put(`/his/medical-tech/${category}/${id}/start`)
 }
 
 export async function saveMedicalTechResult(category: MedicalTechCategory, id: string, input: CompletionInput) {

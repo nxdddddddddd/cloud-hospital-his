@@ -5,6 +5,7 @@ import PageHeader from '@/components/PageHeader.vue'
 import { listMedicalTechOrders, saveMedicalTechResult, startMedicalTechOrder, useMockMedicalTechApi } from '@/api/medicalTech'
 import { medicalTechOrders } from '@/data/medicalTech'
 import { completeMedicalTechOrder, filterMedicalTechOrders, summarizeMedicalTechOrders, type MedicalTechCategory, type MedicalTechOrder, type MedicalTechStatus } from '@/domain/medicalTech'
+import { useUserStore } from '@/stores/user'
 
 type WorkspaceMode = 'pending' | 'patient-entry' | 'result-entry' | 'query'
 const props = defineProps<{ category: MedicalTechCategory; mode: WorkspaceMode }>()
@@ -26,8 +27,11 @@ const keyword = ref('')
 const status = ref<MedicalTechStatus | 'all'>(props.mode === 'pending' ? 'pending' : 'all')
 const selected = ref<MedicalTechOrder>()
 const dialogVisible = ref(false)
-const resultForm = reactive({ executor: '', executedAt: '2026-11-07 11:20', result: '' })
-const patientForm = reactive({ patientName: '', outpatientNo: '', itemName: '', doctorName: '', department: '', executor: '' })
+const userStore = useUserStore()
+// 执行人员由后端按当前登录用户写入，前端只做展示。
+const currentOperator = computed(() => userStore.profile?.nickName || userStore.profile?.name || '当前登录用户')
+const resultForm = reactive({ executedAt: '2026-11-07 11:20', result: '' })
+const patientForm = reactive({ patientName: '', outpatientNo: '', itemName: '', doctorName: '', department: '' })
 const loading = ref(false)
 
 const currentCategory = computed(() => categoryConfig[props.category])
@@ -65,15 +69,14 @@ function statusType(value: MedicalTechStatus) {
 
 function openAction(order: MedicalTechOrder) {
   selected.value = order
-  resultForm.executor = order.executor ?? ''
   resultForm.executedAt = order.executedAt ?? '2026-11-07 11:20'
   resultForm.result = order.result ?? ''
   dialogVisible.value = true
 }
 
 async function saveResult() {
-  if (!selected.value || !resultForm.executor.trim() || !resultForm.result.trim()) {
-    ElMessage.warning('请填写执行人员和结果内容')
+  if (!selected.value || !resultForm.result.trim()) {
+    ElMessage.warning('请填写结果内容')
     return
   }
   if (!useMockMedicalTechApi()) {
@@ -81,15 +84,15 @@ async function saveResult() {
     await loadOrders()
   } else {
     const index = orders.value.findIndex((item) => item.id === selected.value?.id)
-    orders.value[index] = completeMedicalTechOrder(orders.value[index], { ...resultForm })
+    orders.value[index] = { ...completeMedicalTechOrder(orders.value[index], { ...resultForm }), executor: currentOperator.value }
   }
   dialogVisible.value = false
   ElMessage.success(`${currentCategory.value.noun}结果已保存`)
 }
 
 async function registerPatient() {
-  if (!patientForm.outpatientNo || !patientForm.itemName || !patientForm.executor) {
-    ElMessage.warning('请填写门诊号、执行项目和执行人员')
+  if (!patientForm.outpatientNo || !patientForm.itemName) {
+    ElMessage.warning('请填写门诊号和执行项目')
     return
   }
   const order = categoryOrders.value.find((item) => item.status === 'pending' && item.outpatientNo === patientForm.outpatientNo && item.itemName === patientForm.itemName)
@@ -98,14 +101,14 @@ async function registerPatient() {
     return
   }
   if (!useMockMedicalTechApi()) {
-    await startMedicalTechOrder(props.category, order.id, patientForm.executor)
+    await startMedicalTechOrder(props.category, order.id)
     await loadOrders()
   } else {
     order.status = 'inProgress'
-    order.executor = patientForm.executor
+    order.executor = currentOperator.value
     order.executedAt = '2026-11-07 11:20'
   }
-  Object.assign(patientForm, { patientName: '', outpatientNo: '', itemName: '', doctorName: '', department: '', executor: '' })
+  Object.assign(patientForm, { patientName: '', outpatientNo: '', itemName: '', doctorName: '', department: '' })
   ElMessage.success('患者已登记并进入执行中')
 }
 </script>
@@ -133,7 +136,7 @@ async function registerPatient() {
           <el-col :span="6"><el-form-item :label="`${currentCategory.noun}项目`"><el-input v-model="patientForm.itemName" placeholder="请输入执行项目" /></el-form-item></el-col>
           <el-col :span="6"><el-form-item label="申请科室"><el-input v-model="patientForm.department" placeholder="请输入申请科室" /></el-form-item></el-col>
           <el-col :span="6"><el-form-item label="申请医生"><el-input v-model="patientForm.doctorName" placeholder="请输入申请医生" /></el-form-item></el-col>
-          <el-col :span="6"><el-form-item label="执行人员"><el-input v-model="patientForm.executor" placeholder="请输入员工姓名" /></el-form-item></el-col>
+          <el-col :span="6"><el-form-item label="执行人员"><el-input :model-value="currentOperator" disabled /></el-form-item></el-col>
           <el-col :span="12" class="entry-actions"><el-button>读取就诊卡</el-button><el-button type="primary" @click="registerPatient">确认登记</el-button></el-col>
         </el-row>
       </el-form>
@@ -162,7 +165,7 @@ async function registerPatient() {
     <el-dialog v-model="dialogVisible" :title="`${currentCategory.noun}执行结果`" width="640px">
       <div v-if="selected" class="result-patient-strip"><div><span>患者</span><strong>{{ selected.patientName }}</strong></div><div><span>门诊号</span><strong>{{ selected.outpatientNo }}</strong></div><div><span>项目</span><strong>{{ selected.itemName }}</strong></div></div>
       <el-form label-position="top" class="record-form">
-        <el-row :gutter="16"><el-col :span="12"><el-form-item label="执行人员"><el-input v-model="resultForm.executor" /></el-form-item></el-col><el-col :span="12"><el-form-item label="执行时间"><el-input v-model="resultForm.executedAt" /></el-form-item></el-col></el-row>
+        <el-row :gutter="16"><el-col :span="12"><el-form-item label="执行人员"><el-input :model-value="currentOperator" disabled /></el-form-item></el-col><el-col :span="12"><el-form-item label="执行时间"><el-input v-model="resultForm.executedAt" /></el-form-item></el-col></el-row>
         <el-form-item label="结果内容"><el-input v-model="resultForm.result" type="textarea" :rows="6" placeholder="请输入客观、完整的执行结果" /></el-form-item>
       </el-form>
       <template #footer><el-button @click="dialogVisible = false">取消</el-button><el-button type="primary" @click="saveResult">保存结果</el-button></template>

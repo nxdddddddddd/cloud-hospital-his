@@ -5,6 +5,7 @@ import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.ruoyi.common.exception.ServiceException;
+import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.his.mapper.MedicalTechMapper;
 
 @Service
@@ -25,10 +26,10 @@ public class MedicalTechService
     }
 
     @Transactional
-    public void start(String category, Long id, String executor)
+    public void start(String category, Long id)
     {
         CategoryConfig config = category(category);
-        Long employeeId = employeeId(executor);
+        Long employeeId = currentEmployeeId();
         if (mapper.startOrder(config.tableName(), config.fieldPrefix(), id, employeeId) != 1)
         {
             throw new ServiceException("仅已缴费且未执行的申请可以登记");
@@ -36,14 +37,14 @@ public class MedicalTechService
     }
 
     @Transactional
-    public void complete(String category, Long id, String executor, String result, String executedAt)
+    public void complete(String category, Long id, String result, String executedAt)
     {
         if (result == null || result.trim().isEmpty())
         {
             throw new ServiceException("结果内容不能为空");
         }
         CategoryConfig config = category(category);
-        Long employeeId = employeeId(executor);
+        Long employeeId = currentEmployeeId();
         if (mapper.completeOrder(config.tableName(), config.fieldPrefix(), config.inputEmployeeField(),
             id, employeeId, result.trim(), executedAt) != 1)
         {
@@ -51,16 +52,15 @@ public class MedicalTechService
         }
     }
 
-    private Long employeeId(String executor)
+    /**
+     * 执行人员取自RuoYi当前登录用户，忽略前端提交的姓名字符串，避免冒用他人身份。
+     */
+    private Long currentEmployeeId()
     {
-        if (executor == null || executor.trim().isEmpty())
-        {
-            throw new ServiceException("执行人员不能为空");
-        }
-        Long employeeId = mapper.selectEmployeeIdByName(executor.trim());
+        Long employeeId = mapper.selectEmployeeIdByUserId(SecurityUtils.getUserId());
         if (employeeId == null)
         {
-            throw new ServiceException("未找到有效员工：" + executor.trim());
+            throw new ServiceException("当前账号未关联有效医院员工");
         }
         return employeeId;
     }

@@ -11,7 +11,7 @@ public interface MedicalTechMapper
         @Param("category") String category, @Param("status") String status,
         @Param("keyword") String keyword);
 
-    Long selectEmployeeIdByName(@Param("executor") String executor);
+    Long selectEmployeeIdByUserId(@Param("userId") Long userId);
 
     int startOrder(@Param("tableName") String tableName, @Param("fieldPrefix") String fieldPrefix,
         @Param("id") Long id, @Param("employeeId") Long employeeId);

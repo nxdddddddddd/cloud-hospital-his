@@ -31,8 +31,8 @@
         order by rq.creation_time desc, rq.id desc
     </select>
 
-    <select id="selectEmployeeIdByName" resultType="long">
-        select id from employee where realname = #{executor} and delmark = 1 order by id limit 1
+    <select id="selectEmployeeIdByUserId" resultType="long">
+        select id from employee where sys_user_id = #{userId} and delmark = 1 limit 1
     </select>
 
     <update id="startOrder">
